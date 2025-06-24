@@ -5,6 +5,7 @@ import PyPDF2 as pdf
 import google.generativeai as genai
 import DB_Setup as db
 import pandas as pd
+import prompts
 
 # Streamlit app
 st.set_page_config(page_title="Report Writer")
@@ -58,16 +59,21 @@ def excel_data(file):
     return None
 
 
-def generate_response(content,extra_query):
+def generate_response_short_summary(content,extra_query):
     """Generate a summary based on the content."""
     if content:
-        combined_input = f"""User Query:\n Content:\n{content}\nGenerate a summary over the given content. 
-                            this might be image or text or pdf or excel kind of extracted data
-                            Be careful while provideing the summary
-                            if its  an image : then provide summary on what is present in the image
-                            Addtional Instructions : {extra_query}"""
+        combined_input = prompts.short_summary_prompt_template.format(content,extra_query)
         return model.generate_content(combined_input).text
     return "No valid content to process."
+
+
+def generate_response_report(content):
+    """Generate a summary based on the content."""
+    if content:
+        combined_input = prompts.real_time_report_prompt.format(content)
+        return model.generate_content(combined_input).text
+    return "No valid content to process."
+
 
 
 
@@ -108,7 +114,7 @@ if st.button("Store Data"):
     if input_data:
         extra_instruction = """Make the summary of the data as if you were real witness of the content
                                 It should simulate real person view."""
-        input_data_summary = generate_response(input_data,extra_instruction)
+        input_data_summary = generate_response_short_summary(input_data,prompts.short_summary_prompt_template)
         if not input_file:
             database.store_data(input_data, input_data_summary)
         else:
@@ -123,11 +129,8 @@ user_query = st.text_input("Enter your query:")
 if st.button("Get Report"):
     if user_query:
         retrieved_data = database.retrieve_data()
-        extra_instruction = """You were given already existing summaries of different occasions.
-                                Now you need to generate a real-time Report for Presentation Ready.
-                                If you want , you can make partions in the report regarding the timeline only if needeed.
-                                Make sure it should simulate real time Report."""
-        overall_report = generate_response(retrieved_data,extra_instruction)
+        
+        overall_report = generate_response_report(retrieved_data)
         if retrieved_data:
             st.header("The Response is:")
             st.write(overall_report)
